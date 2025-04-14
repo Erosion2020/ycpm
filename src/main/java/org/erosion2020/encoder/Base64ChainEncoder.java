@@ -14,10 +14,12 @@ public class Base64ChainEncoder extends ChainEncoder {
     @Override
     public Object serialize(Object chain) throws Exception {
         byte[] result = null;
-        if(chain instanceof String) {
-            chain = chain.toString().getBytes();
-        }else {
-            chain = Serializer.serialize(chain);
+        if(!(chain instanceof byte[])) {
+            if(chain instanceof String) {
+                chain = chain.toString().getBytes();
+            }else {
+                chain = Serializer.serialize(chain);
+            }
         }
         Base64.Encoder encoder = Base64.getEncoder();
         result = encoder.encode((byte[]) chain);
