@@ -141,7 +141,7 @@ public class Gadgets {
         // inject class bytes into instance
         Reflections.setFieldValue(templates, "_bytecodes", new byte[][] {classBytes});
         // required to make TemplatesImpl happy
-        Reflections.setFieldValue(templates, "_name", "Pwnr");
+        Reflections.setFieldValue(templates, "_name", "Pwnr_" + System.nanoTime());
         Reflections.setFieldValue(templates, "_tfactory", transFactory.newInstance());
         return templates;
     }

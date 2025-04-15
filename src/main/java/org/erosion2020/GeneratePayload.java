@@ -6,6 +6,10 @@ import org.erosion2020.payloads.ObjectPayload.Utils;
 import org.erosion2020.payloads.annotation.Authors;
 import org.erosion2020.payloads.annotation.Dependencies;
 
+import org.slf4j.LoggerFactory;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+
 import java.io.PrintStream;
 import java.util.*;
 
@@ -13,6 +17,12 @@ import java.util.*;
 public class GeneratePayload {
 	private static final int INTERNAL_ERROR_CODE = 70;
 	private static final int USAGE_CODE = 64;
+
+	static {
+		// 关闭 ROOT 日志（Logback）
+		Logger root = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+		root.setLevel(Level.OFF);
+	}
 
 	public static void main(final String[] args) {
 		if (args.length != 2 && args.length != 3) {

