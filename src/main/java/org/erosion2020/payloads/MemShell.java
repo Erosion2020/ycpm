@@ -33,7 +33,7 @@ public class MemShell implements ObjectPayload<Object> {
         String name = commandCursor.next();
         String pattern = commandCursor.next();
         String password = commandCursor.next();
-        if(password.startsWith("bx")){
+        if(mem_type.startsWith("bx")){
             String md5 = Gadgets.md5(password);
             password = md5.substring(0, 16);
         }

